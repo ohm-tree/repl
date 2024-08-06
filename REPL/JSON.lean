@@ -26,12 +26,20 @@ If `env = some n`, builds on the existing environment `n`.
 structure Command extends CommandOptions where
   env : Option Nat
   cmd : String
+  ast : Option Bool := none
+  tactics : Option Bool
+  premises : Option Bool
+  commandAST : Option Bool
 deriving ToJson, FromJson
 
 /-- Process a Lean file in a fresh environment. -/
-structure File extends CommandOptions where
-  path : System.FilePath
-deriving FromJson
+structure File where
+  path : String
+  env : Option Nat
+  tactics : Option Bool
+  premises : Option Bool
+  commandAST : Option Bool
+  deriving FromJson, ToJson
 
 /--
 Run a tactic in a proof state.
@@ -123,6 +131,7 @@ structure CommandResponse where
   sorries : List Sorry := []
   tactics : List Tactic := []
   infotree : Option Json := none
+  ast : Option Json := none -- 新增字段，用于存储AST信息
 deriving FromJson
 
 def Json.nonemptyList [ToJson α] (k : String) : List α → List (String × Json)
@@ -135,7 +144,8 @@ instance : ToJson CommandResponse where
     Json.nonemptyList "messages" r.messages,
     Json.nonemptyList "sorries" r.sorries,
     Json.nonemptyList "tactics" r.tactics,
-    match r.infotree with | some j => [("infotree", j)] | none => []
+    match r.infotree with | some j => [("infotree", j)] | none => [],
+    match r.ast with | some j => [("ast", j)] | none => [] -- 处理Option类型的ast字段
   ]
 
 /--
@@ -148,6 +158,7 @@ structure ProofStepResponse where
   messages : List Message := []
   sorries : List Sorry := []
   traces : List String
+  ast : Option Json := none -- 新增字段，用于存储AST信息
 deriving ToJson, FromJson
 
 instance : ToJson ProofStepResponse where
@@ -156,7 +167,8 @@ instance : ToJson ProofStepResponse where
     [("goals", toJson r.goals)],
     Json.nonemptyList "messages" r.messages,
     Json.nonemptyList "sorries" r.sorries,
-    Json.nonemptyList "traces" r.traces
+    Json.nonemptyList "traces" r.traces,
+    match r.ast with | some j => [("ast", j)] | none => [] -- 处理Option类型的ast字段
   ]
 
 /-- Json wrapper for an error. -/

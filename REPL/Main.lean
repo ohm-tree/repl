@@ -11,6 +11,7 @@ import REPL.Lean.Environment
 import REPL.Lean.InfoTree
 import REPL.Lean.InfoTree.ToJson
 import REPL.Snapshots
+import REPL.ExtractData
 
 /-!
 # A REPL for Lean.
@@ -72,6 +73,7 @@ structure State where
   and report the numerical index for the recorded state at each sorry.
   -/
   proofStates : Array ProofSnapshot := #[]
+
 
 /--
 The Lean REPL monad.
@@ -143,9 +145,10 @@ def createProofStepReponse (proofState : ProofSnapshot) (old? : Option ProofSnap
   return {
     proofState := id
     goals := (← proofState.ppGoals).map fun s => s!"{s}"
-    messages
-    sorries
-    traces }
+    messages := messages
+    sorries := sorries
+    traces := traces
+    ast := none}
 
 /-- Pickle a `CommandSnapshot`, generating a JSON response. -/
 def pickleCommandSnapshot (n : PickleEnvironment) : M m (CommandResponse ⊕ Error) := do
@@ -153,13 +156,27 @@ def pickleCommandSnapshot (n : PickleEnvironment) : M m (CommandResponse ⊕ Err
   | none => return .inr ⟨"Unknown environment."⟩
   | some env =>
     discard <| env.pickle n.pickleTo
-    return .inl { env := n.env }
+    return .inl {
+      env := n.env
+      messages := []
+      sorries := []
+      tactics := []
+      infotree := none
+      ast := none -- 设置为none，因为pickle操作不涉及AST提取
+    }
 
 /-- Unpickle a `CommandSnapshot`, generating a JSON response. -/
 def unpickleCommandSnapshot (n : UnpickleEnvironment) : M IO CommandResponse := do
   let (env, _) ← CommandSnapshot.unpickle n.unpickleEnvFrom
   let env ← recordCommandSnapshot env
-  return { env }
+  return {
+    env := env
+    messages := []
+    sorries := []
+    tactics := []
+    infotree := none
+    ast := none -- 设置为none，因为unpickle操作不涉及AST提取
+  }
 
 /-- Pickle a `ProofSnapshot`, generating a JSON response. -/
 -- This generates a new identifier, which perhaps is not what we want?
@@ -199,8 +216,6 @@ def runCommand (s : Command) : M IO (CommandResponse ⊕ Error) := do
   catch ex =>
     return .inr ⟨ex.toString⟩
   let messages ← messages.mapM fun m => Message.of m
-  -- For debugging purposes, sometimes we print out the trees here:
-  -- trees.forM fun t => do IO.println (← t.format)
   let sorries ← sorries trees (initialCmdState?.map (·.env))
   let tactics ← match s.allTactics with
   | some true => tactics trees
@@ -224,17 +239,26 @@ def runCommand (s : Command) : M IO (CommandResponse ⊕ Error) := do
     pure none
   else
     pure <| some <| Json.arr (← jsonTrees.toArray.mapM fun t => t.toJson none)
+  let opts : ExtractionConfig := {
+    extractTactics := s.tactics.getD true,
+    extractPremises := s.premises.getD true,
+    -- extractCommandASTs := s.commandAST.getD false
+  }
+  let ast ← match s.ast with
+  | some true => extractAST s.cmd opts
+  | _ => pure (toJson ([] : List Json))
   return .inl
     { env,
       messages,
       sorries,
-      tactics
-      infotree }
+      tactics,
+      infotree,
+      ast } -- 返回AST信息
 
 def processFile (s : File) : M IO (CommandResponse ⊕ Error) := do
   try
     let cmd ← IO.FS.readFile s.path
-    runCommand { s with env := none, cmd }
+    runCommand { s with env := none, cmd, tactics := true, premises := true, commandAST := true, infotree := none }
   catch e =>
     pure <| .inr ⟨e.toString⟩
 
