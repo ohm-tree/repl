@@ -342,8 +342,8 @@ where loop : M IO Unit := do
   let query ← getLines
   if query = "" then
     return ()
-  if query.startsWith "#" || query.startsWith "--" then loop else
   printFlush "\n<START>\n" -- easier to parse the output if there are blank lines
+  if query.startsWith "#" || query.startsWith "--" then loop else
   IO.println <| toString <| ← match ← parse query with
   | .command r => return toJson (← runCommand r)
   | .file r => return toJson (← processFile r)
