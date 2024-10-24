@@ -348,7 +348,7 @@ where loop : M IO Unit := do
   | .unpickleEnvironment r => return toJson (← unpickleCommandSnapshot r)
   | .pickleProofSnapshot r => return toJson (← pickleProofSnapshot r)
   | .unpickleProofSnapshot r => return toJson (← unpickleProofSnapshot r)
-  printFlush "\n" -- easier to parse the output if there are blank lines
+  printFlush "\n<STOP>\n" -- easier to parse the output if there are blank lines
   loop
 
 /-- Main executable function, run as `lake exe repl`. -/
