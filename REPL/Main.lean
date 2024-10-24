@@ -336,6 +336,7 @@ def printFlush [ToString α] (s : α) : IO Unit := do
 unsafe def repl : IO Unit :=
   StateT.run' loop {}
 where loop : M IO Unit := do
+  printFlush "\n<START>\n" -- easier to parse the output if there are blank lines
   let query ← getLines
   if query = "" then
     return ()
