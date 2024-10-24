@@ -335,9 +335,6 @@ def printFlush [ToString α] (s : α) : IO Unit := do
 /-- Read-eval-print loop for Lean. -/
 unsafe def repl : IO Unit :=
   StateT.run' loop {}
-
-printFlush "\n<INIT>\n" -- easier to parse the output if there are blank lines
-
 where loop : M IO Unit := do
   let query ← getLines
   if query = "" then
